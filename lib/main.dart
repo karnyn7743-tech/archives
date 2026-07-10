@@ -1,24 +1,31 @@
 import 'package:flutter/material.dart';
-import 'screens/scanner_screen.dart'; // استدعاء شاشة المسح الحية
+import 'screens/exam_generator_screen.dart'; // استيراد شاشة التوليد مباشرة
 
 void main() {
-  runApp(const MyApp());
+  runApp(const ExamAutomationApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class ExamAutomationApp extends StatelessWidget {
+  const ExamAutomationApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'نظام أبو الخضر البعيثي للرصد الذكي',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        fontFamily: 'Cairo',
-      ),
-      home: const ScannerScreen(), // التشغيل المباشر لشاشة المسح والـ OCR
-      locale: const Locale('ar', 'YE'),
+      title: 'نظام طباعة الأكواد على أوراق الاختبارات',
       debugShowCheckedModeBanner: false,
+      // ضبط الثيم العام للتطبيق ليتوافق مع ألوان الهوية البصرية الجديدة
+      theme: ThemeData(
+        primaryColor: const Color(0xff029ae4),
+        scaffoldBackgroundColor: const Color(0xffeef7fe),
+        fontFamily: 'Cairo', // تعيين الخط العربي الافتراضي لواجهات التطبيق
+        appBarTheme: const AppBarTheme(
+          backgroundColor: const Color(0xff029ae4),
+          centerTitle: true,
+          elevation: 2,
+        ),
+      ),
+      // جعل شاشة توليد أوراق الاختبارات هي الشاشة الرئيسية للتطبيق
+      home: const ExamGeneratorScreen(),
     );
   }
 }
