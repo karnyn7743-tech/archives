@@ -1,4 +1,4 @@
-package com.example.school_grading_app
+package com.example.secretariat_app
 
 import io.flutter.embedding.android.FlutterActivity
 
