@@ -1,5 +1,5 @@
 name: secretariat_app
-description: "A Flutter application for student attendance and smart QR/OCR grading system."
+description: "A Flutter application for archives system."
 publish_to: 'none'
 
 version: 1.0.0+1
