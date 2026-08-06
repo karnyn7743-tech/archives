@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/register_category.dart';
 import 'document_entry_screen.dart';
+import 'search_preview_screen.dart';
 
 class RegisterOptionsScreen extends StatelessWidget {
   final RegisterCategory category;
@@ -19,12 +20,14 @@ class RegisterOptionsScreen extends StatelessWidget {
         body: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
-            stretch: true,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Card(
                 color: category.color.withOpacity(0.1),
                 elevation: 0,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Row(
@@ -34,7 +37,11 @@ class RegisterOptionsScreen extends StatelessWidget {
                       Expanded(
                         child: Text(
                           'إدارة ${category.title}',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: category.color),
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: category.color,
+                          ),
                         ),
                       ),
                     ],
@@ -66,10 +73,15 @@ class RegisterOptionsScreen extends StatelessWidget {
               // زر عرض الوثائق المأرشفة
               OutlinedButton.icon(
                 onPressed: () {
-                  // إمكانية الربط مع شاشة عرض الجدول مستقبلاً
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SearchPreviewScreen(category: category),
+                    ),
+                  );
                 },
                 icon: const Icon(Icons.description),
-                label: const Text('عَرَض السجلات المأرشفة', style: TextStyle(fontSize: 16)),
+                label: const Text('عرض السجلات المأرشفة', style: TextStyle(fontSize: 16)),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
