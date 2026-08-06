@@ -1,39 +1,42 @@
-import 'package:flutter/material.dart';
-
-class RegisterCategory {
-  final String id;
-  final String title;
-  final IconData icon;
-  final Color color;
-  final String excelSheetName;
-  final List<String> columns;
-
-  RegisterCategory({
-    required this.id,
-    required this.title,
-    required this.icon,
-    this.color = Colors.indigo,
-    required this.excelSheetName,
-    required this.columns,
-  });
-}
-
-// قائمة السجلات التوضيحية
 final List<RegisterCategory> mainCategories = [
+  RegisterCategory(
+    id: 'transfers',
+    title: 'سجل المنقولين',
+    icon: Icons.move_up,
+    color: Colors.indigo,
+    excelSheetName: 'Transfers',
+    columns: ['م', 'اسم الطالب', 'المدرسة المنقول إليها', 'تاريخ النقل', 'ملاحظات'],
+  ),
+  RegisterCategory(
+    id: 'absences',
+    title: 'سجل الغياب والغياب اليومي',
+    icon: Icons.person_off,
+    color: Colors.teal,
+    excelSheetName: 'Absences',
+    columns: ['م', 'اسم الطالب', 'الصف', 'تاريخ الغياب', 'العذر'],
+  ),
+  RegisterCategory(
+    id: 'certificates',
+    title: 'سجل الشهادات والوثائق',
+    icon: Icons.card_membership,
+    color: Colors.orange,
+    excelSheetName: 'Certificates',
+    columns: ['م', 'اسم الطالب', 'نوع الوثيقة', 'تاريخ الإصدار', 'ملاحظات'],
+  ),
   RegisterCategory(
     id: 'year_work',
     title: 'سجل أعمال سنة',
     icon: Icons.edit_calendar,
-    color: Colors.teal,
+    color: Colors.blue,
     excelSheetName: 'Year_Work',
-    columns: ['م', 'الاسم', 'درجة الأعمال', 'ملاحظات'],
+    columns: ['م', 'اسم الطالب', 'الصف', 'درجة الأعمال', 'ملاحظات'],
   ),
   RegisterCategory(
     id: 'repeaters',
     title: 'سجلات المعيدين',
     icon: Icons.repeat,
-    color: Colors.orange,
+    color: Colors.amber,
     excelSheetName: 'Repeaters',
-    columns: ['م', 'اسم الطالب', 'الصف السابق', 'حالة الإعادة', 'ملاحظات'],
+    columns: ['م', 'اسم الطالب', 'الصف', 'حالة الإعادة', 'ملاحظات'],
   ),
 ];
