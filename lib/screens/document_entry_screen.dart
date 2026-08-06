@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:excel/excel.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/register_category.dart';
 
 class DocumentEntryScreen extends StatefulWidget {
@@ -13,17 +15,16 @@ class DocumentEntryScreen extends StatefulWidget {
 }
 
 class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
+  final _formKey = GlobalKey<FormState>();
   final Map<String, TextEditingController> _controllers = {};
-  File? _selectedImage;
-  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
     super.initState();
-    // إنشاء متحكم لكل عمود خاص بالسجل المختار تلقائياً
-    for (var column in widget.category.columns) {
-      if (column != 'م') { // إغفال الترقيم التلقائي
-        _controllers[column] = TextEditingController();
+    // إنشاء متحكم لكل عمود في السجل تلقائياً
+    for (var col in widget.category.columns) {
+      if (col != 'م') {
+        _controllers[col] = TextEditingController();
       }
     }
   }
@@ -36,31 +37,63 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
     super.dispose();
   }
 
-  // التقاط صورة عبر الكاميرا أو المعرض
-  Future<void> _pickImage(ImageSource source) async {
+  // دالة إنشاء ملف Excel وتصديره ومشاركته
+  Future<void> _saveAndExportDocument() async {
+    if (!_formKey.currentState!.validate()) return;
+
     try {
-      final XFile? pickedFile = await _picker.pickImage(
-        source: source,
-        imageQuality: 85,
-      );
-      if (pickedFile != null) {
-        setState(() {
-          _selectedImage = File(pickedFile.path);
-        });
+      // 1. إنشاء ملف Excel جديد
+      var excel = Excel.createExcel();
+      String sheetName = widget.category.excelSheetName;
+      
+      // تغيير اسم ورقة العمل أو استخدام الافتراضية
+      Sheet sheetObject = excel[sheetName];
+      excel.setDefaultSheet(sheetName);
+
+      // 2. إضافة رؤوس الأعمدة
+      List<CellValue> headers = widget.category.columns.map((e) => TextCellValue(e)).toList();
+      sheetObject.appendRow(headers);
+
+      // 3. إضافة البيانات أدخلها المستخدم
+      List<CellValue> rowData = [];
+      for (var col in widget.category.columns) {
+        if (col == 'م') {
+          rowData.add(TextCellValue('1'));
+        } else {
+          rowData.add(TextCellValue(_controllers[col]?.text ?? ''));
+        }
+      }
+      sheetObject.appendRow(rowData);
+
+      // 4. ترميز الملف وتحديد المسار المؤقت للحفظ
+      var fileBytes = excel.save();
+      if (fileBytes != null) {
+        final directory = await getTemporaryDirectory();
+        final filePath = '${directory.path}/${widget.category.excelSheetName}_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+        
+        File(filePath)
+          ..createSync(recursive: true)
+          ..writeAsBytesSync(fileBytes);
+
+        // 5. فتح نافذة المشاركة فوراً لحفظ الملف في Downloads أو إرساله
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('تم تجهيز الملف بنجاح!')),
+          );
+          
+          await Share.shareXFiles(
+            [XFile(filePath)],
+            text: 'سجل مأرشف: ${widget.category.title}',
+          );
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('خطأ في التقاط الصورة: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('حدث خطأ أثناء التصدير: $e')),
+        );
+      }
     }
-  }
-
-  void _saveDocument() {
-    // هنا يتم حفظ البيانات مع مسار الصورة _selectedImage?.path
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('تمت أرشفة المستند في ${widget.category.title} بنجاح')),
-    );
-    Navigator.pop(context);
   }
 
   @override
@@ -69,87 +102,74 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('إدخال وثيقة: ${widget.category.title}'),
+          title: Text('إدخال: ${widget.category.title}'),
           centerTitle: true,
         ),
         body: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // قسم التقاط المرفق / الصورة
-              Card(
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Column(
-                    children: [
-                      _selectedImage != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(8),
-                              child: Image.file(_selectedImage!, height: 180, fit: BoxFit.cover),
-                            )
-                          : Container(
-                              height: 120,
-                              decoration: BoxDecoration(
-                                color: Colors.grey.shade100,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: Colors.grey.shade300),
-                              ),
-                              child: const Center(
-                                child: Text('لم يتم إلتقاط صورة للوثيقة بعد'),
-                              ),
-                            ),
-                      const SizedBox(height: 12),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          ElevatedButton.icon(
-                            onPressed: () => _pickImage(ImageSource.camera),
-                            icon: const Icon(Icons.camera_alt),
-                            label: const Text('الكاميرا'),
-                            style: ElevatedButton.styleFrom(backgroundColor: widget.category.color, foregroundColor: Colors.white),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Card(
+                  color: widget.category.color.withOpacity(0.1),
+                  elevation: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Row(
+                      children: [
+                        Icon(widget.category.icon, color: widget.category.color),
+                        const SizedBox(width: 8),
+                        Text(
+                          'تعبئة بيانات ${widget.category.title}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: widget.category.color,
                           ),
-                          OutlinedButton.icon(
-                            onPressed: () => _pickImage(ImageSource.gallery),
-                            icon: const Icon(Icons.photo_library),
-                            label: const Text('المعرض'),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // حقول إدخال البيانات الديناميكية المستخرجة من أعمدة السجل
-              ..._controllers.entries.map((entry) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12.0),
-                  child: TextField(
-                    controller: entry.value,
-                    decoration: InputDecoration(
-                      labelText: entry.key,
-                      border: const OutlineInputBorder(),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                        ),
+                      ],
                     ),
                   ),
-                );
-              }).toList(),
-
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _saveDocument,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  backgroundColor: widget.category.color,
-                  foregroundColor: Colors.white,
                 ),
-                child: const Text('حفظ وأرشفة الوثيقة', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-              ),
-            ],
+                const SizedBox(height: 16),
+                
+                // توليد الحقول ديناميكياً حسب أعمدة السجل
+                ...widget.category.columns.where((col) => col != 'م').map((colName) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: TextFormField(
+                      controller: _controllers[colName],
+                      decoration: InputDecoration(
+                        labelText: colName,
+                        border: const OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'يرجى إدخال $colName';
+                        }
+                        return null;
+                      },
+                    ),
+                  );
+                }).toList(),
+
+                const SizedBox(height: 20),
+
+                // زر حفظ الوثيقة وتصديرها
+                ElevatedButton.icon(
+                  onPressed: _saveAndExportDocument,
+                  icon: const Icon(Icons.save_alt_rounded),
+                  label: const Text('حفظ وتصدير إلى Excel', style: TextStyle(fontSize: 16)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: widget.category.color,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
