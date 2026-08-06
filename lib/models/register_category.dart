@@ -38,10 +38,10 @@ final List<RegisterCategory> allArchiveCategories = [
   ),
   RegisterCategory(
     id: 'enrollment',
-    title: 'سجل القيد والتسجيل',
+    title: 'سجل القيد والتوزيع',
     icon: Icons.app_registration_rounded,
     color: Colors.blue,
-    excelSheetName: 'القيد_والتسجيل',
+    excelSheetName: 'القيد_والتوزيع',
     columns: ['م', 'رقم القيد', 'اسم الطالب', 'تاريخ الميلاد', 'الصف', 'اسم ولي الأمر', 'ملاحظات'],
   ),
   RegisterCategory(
