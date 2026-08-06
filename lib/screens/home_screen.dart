@@ -1,46 +1,53 @@
 import 'package:flutter/material.dart';
-import 'register_category.dart';
+import '../models/register_category.dart';
+import 'register_options_screen.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  HomeScreen({Key? key}) : super(key: key);
+
+  // تعريف قائمة السجلات الرئيسية لتجنب خطأ mainCategories
+  final List<RegisterCategory> mainCategories = [
+    RegisterCategory(
+      id: 'transfers',
+      title: 'سجل المنقولين',
+      icon: Icons.move_up,
+      columns: ['م', 'اسم الطالب', 'المدرسة المنقول إليها', 'تاريخ النقل', 'ملاحظات'],
+    ),
+    RegisterCategory(
+      id: 'absences',
+      title: 'سجل الغياب والغياب اليومي',
+      icon: Icons.person_off,
+      columns: ['م', 'اسم الطالب', 'الصف', 'تاريخ الغياب', 'العذر'],
+    ),
+    RegisterCategory(
+      id: 'certificates',
+      title: 'سجل الشهادات والوثائق',
+      icon: Icons.card_membership,
+      columns: ['م', 'اسم الطالب', 'نوع الوثيقة', 'تاريخ الإصدار', 'ملاحظات'],
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
-        backgroundColor: const Color(0xFFA5F0FA),
         appBar: AppBar(
-          title: const Text(
-            'الأرشفة الإدارية',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
-          ),
+          title: const Text('نظام الأرشيف والسجلات السكرتارية'),
           centerTitle: true,
-          elevation: 2,
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: () {
-                // فتح شاشة البحث العام
-              },
-            ),
-          ],
         ),
-        body: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: GridView.builder(
-            itemCount: mainCategories.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2, // عدد الأعمدة (يمكن تعديلها لـ 3 على الشاشات الكبيرة)
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 1.1,
-            ),
-            itemBuilder: (context, index) {
-              final category = mainCategories[index];
-              return _buildCategoryCard(context, category);
-            },
+        body: GridView.builder(
+          padding: const EdgeInsets.all(16.0),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
           ),
+          itemCount: mainCategories.length,
+          itemBuilder: (context, index) {
+            final category = mainCategories[index];
+            return _buildCategoryCard(context, category);
+          },
         ),
       ),
     );
@@ -49,49 +56,32 @@ class HomeScreen extends StatelessWidget {
   Widget _buildCategoryCard(BuildContext context, RegisterCategory category) {
     return Card(
       elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
-        onTap: () {
-          // الانتقال لشاشة خيارات السجل المختار
-          _navigateToRegisterOptions(context, category);
-        },
-        borderRadius: BorderRadius.circular(15),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(15),
-            gradient: LinearGradient(
-              colors: [Colors.white, Colors.indigo.shade50],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+        onTap: () => _navigateToRegisterOptions(context, category),
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(category.icon, size: 48, color: Colors.indigo),
+            const SizedBox(height: 12),
+            Text(
+              category.title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircleAvatar(
-                radius: 28,
-                backgroundColor: category.color.withOpacity(0.15),
-                child: Icon(category.icon, size: 30, color: category.color),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                category.title,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-            ],
-          ),
+          ],
         ),
       ),
     );
   }
 
   void _navigateToRegisterOptions(BuildContext context, RegisterCategory category) {
-    // سيتم ربطها بشاشة الخيارات (إضافة / استعراض)
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RegisterOptionsScreen(category: category),
+      ),
+    );
   }
 }
