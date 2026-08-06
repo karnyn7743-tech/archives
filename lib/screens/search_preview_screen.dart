@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'register_category.dart';
+import '../models/register_category.dart';
 
 // نموذج وهمي يمثل الوثيقة المخزنة
 class ArchiveDocument {
