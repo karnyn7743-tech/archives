@@ -32,9 +32,10 @@ android {
 
     buildTypes {
     release {
-        signingConfig signingConfigs.debug
-        minifyEnabled true
-        proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        // استخدام صيغة Kotlin المعتمدة
+        signingConfig = signingConfigs.getByName("debug")
+        isMinifyEnabled = false
+        isShrinkResources = false
     }
 }
 
