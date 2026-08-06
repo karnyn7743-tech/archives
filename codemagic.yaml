@@ -1,13 +1,38 @@
 workflows:
-  build-android:
-    name: Build Android APK
-    instance_type: mac_mini_m2 # أو أي نوع آلة بناء تفضله
+  android-build-workflow:
+    name: Android Release Build
+    max_build_duration: 30
+    instance_type: mac_mini_m1
+    
+    # تحديد بيئة التشغيل وإصدارات أدوات البناء
+    environment:
+      flutter: stable
+      java: 17
+      
+    # تنفيذ الخطوات داخل مجلد المشروع
     scripts:
-      - name: Clean Flutter project
-        script: flutter clean
-      - name: Get Flutter packages
-        script: flutter pub get
-      - name: Build APK with Flutter
-        script: flutter build apk --release
+      - name: Set up local.properties
+        script: |
+          echo "flutter.sdk=$HOME/programs/flutter" > android/local.properties
+
+      - name: Get Flutter dependencies
+        script: |
+          flutter packages pub get
+
+      - name: Build Android APK
+        script: |
+          flutter build apk --release
+
+    # الملفات الناتجة بعد اكتمال البناء
     artifacts:
-      - build/app/outputs/flutter-apk/app-release.apk
+      - build/app/outputs/flutter-apk/*.apk
+
+    # إشعارات البريد الإلكتروني (اختياري)
+    publishing:
+      email:
+        recipients:
+          - user@example.com # استبدله بإيميلك لتصلك روابط التحميل
+        notify:
+          success: true
+          failure: true
+
