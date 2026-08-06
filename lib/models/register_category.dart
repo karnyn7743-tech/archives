@@ -1,19 +1,18 @@
 import 'package:flutter/material.dart';
 
 class RegisterCategory {
+  final String id;
   final String title;
   final IconData icon;
-  final String excelSheetName;
-  final Color color;
+  final List<String> columns;
 
   RegisterCategory({
+    required this.id,
     required this.title,
     required this.icon,
-    required this.excelSheetName,
-    this.color = Colors.indigo,
+    required this.columns,
   });
 }
-
 final List<RegisterCategory> mainCategories = [
   RegisterCategory(title: 'سجل التعميمات والأوامر', icon: Icons.assignment, excelSheetName: 'Circulars'),
   RegisterCategory(title: 'سجل التكريمات والجزاءات', icon: Icons.military_tech, excelSheetName: 'Honors_Penalties'),
