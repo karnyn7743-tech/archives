@@ -3,34 +3,7 @@ import '../models/register_category.dart';
 import 'register_options_screen.dart';
 
 class HomeScreen extends StatelessWidget {
-  HomeScreen({Key? key}) : super(key: key);
-
-  final List<RegisterCategory> mainCategories = [
-    RegisterCategory(
-      id: 'transfers',
-      title: 'سجل المنقولين',
-      icon: Icons.move_up,
-      color: Colors.indigo,
-      excelSheetName: 'Transfers',
-      columns: ['م', 'اسم الطالب', 'المدرسة المنقول إليها', 'تاريخ النقل', 'ملاحظات'],
-    ),
-    RegisterCategory(
-      id: 'absences',
-      title: 'سجل الغياب والغياب اليومي',
-      icon: Icons.person_off,
-      color: Colors.teal,
-      excelSheetName: 'Absences',
-      columns: ['م', 'اسم الطالب', 'الصف', 'تاريخ الغياب', 'العذر'],
-    ),
-    RegisterCategory(
-      id: 'certificates',
-      title: 'سجل الشهادات والوثائق',
-      icon: Icons.card_membership,
-      color: Colors.orange,
-      excelSheetName: 'Certificates',
-      columns: ['م', 'اسم الطالب', 'نوع الوثيقة', 'تاريخ الإصدار', 'ملاحظات'],
-    ),
-  ];
+  const HomeScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -38,19 +11,21 @@ class HomeScreen extends StatelessWidget {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('نظام الأرشيف والسجلات السكرتارية'),
+          title: const Text('الأرشفة الإدارية والسكرتارية'),
           centerTitle: true,
         ),
         body: GridView.builder(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(12.0),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
+            crossAxisSpacing: 10,
+            mainAxisSpacing: 10,
+            childAspectRatio: 1.05,
           ),
-          itemCount: mainCategories.length,
+          // هما السطرين المطلوبين لقراءة كافة السجلات الـ 18 ديناميكياً:
+          itemCount: allArchiveCategories.length,
           itemBuilder: (context, index) {
-            final category = mainCategories[index];
+            final category = allArchiveCategories[index];
             return _buildCategoryCard(context, category);
           },
         ),
@@ -60,32 +35,39 @@ class HomeScreen extends StatelessWidget {
 
   Widget _buildCategoryCard(BuildContext context, RegisterCategory category) {
     return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 3,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: InkWell(
-        onTap: () => _navigateToRegisterOptions(context, category),
-        borderRadius: BorderRadius.circular(12),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(category.icon, size: 48, color: category.color),
-            const SizedBox(height: 12),
-            Text(
-              category.title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => RegisterOptionsScreen(category: category),
             ),
-          ],
+          );
+        },
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircleAvatar(
+                radius: 26,
+                backgroundColor: category.color.withOpacity(0.15),
+                child: Icon(category.icon, size: 28, color: category.color),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                category.title,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
-  }
-
-  void _navigateToRegisterOptions(BuildContext context, RegisterCategory category) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => RegisterOptionsScreen(category: category),
       ),
     );
   }
