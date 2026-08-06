@@ -1,137 +1,97 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
-import 'package:excel/excel.dart'; // تأكد من وجود مكتبة excel في الـ pubspec
-import 'package:file_picker/file_picker.dart';
+import 'register_category.dart';
 
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  // قائمة المواد أصبحت فارغة في البداية وتنتظر القراءة من ملف الإكسيل
-  List<String> subjects = []; 
-  String? selectedSubject;
-  String? excelFilePath;
-
-  // دالة اختيار ملف الإكسيل وقراءة المواد ديناميكياً من الأعمدة (5 إلى 19)
-  Future<void> pickAndLoadExcel() async {
-    try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['xlsx', 'xls'],
-      );
-
-      if (result != null && result.files.single.path != null) {
-        String path = result.files.single.path!;
-        var bytes = File(path).readAsBytesSync();
-        var excel = Excel.decodeBytes(bytes);
-
-        // قراءة أول ورقة عمل (Sheet) في الملف
-        String firstSheet = excel.tables.keys.first;
-        var table = excel.tables[firstSheet];
-
-        if (table != null && table.maxRows > 0) {
-          // قراءة الصف الأول (العناوين) لمعرفة أسماء المواد
-          var firstRow = table.rows.first;
-          List<String> extractedSubjects = [];
-
-          // الأعمدة في البرمجة تبدأ من 0:
-          // العمود الخامس (E) هو رقم 4 ، والعمود التاسع عشر (S) هو رقم 18
-          for (int i = 4; i <= 18; i++) {
-            if (i < firstRow.length && firstRow[i] != null) {
-              String cellValue = firstRow[i]!.value.toString().trim();
-              if (cellValue.isNotEmpty && cellValue != "null") {
-                extractedSubjects.add(cellValue);
-              }
-            }
-          }
-
-          // تحديث الواجهة بالقائمة الجديدة التي تم استخراجها من الملف
-          setState(() {
-            excelFilePath = path;
-            subjects = extractedSubjects;
-            // اختيار أول مادة تم العثور عليها كخيار افتراضي
-            selectedSubject = subjects.isNotEmpty ? subjects.first : null;
-          });
-        }
-      }
-    } catch (e) {
-      // إظهار تنبيه في حال وجود مشكلة بملف الإكسيل
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("خطأ في قراءة ملف الإكسيل: $e")),
-      );
-    }
-  }
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Scaffold(
+        backgroundColor: const Color(0xFFA5F0FA),
         appBar: AppBar(
-          title: const Text('رصد درجات الطلاب'),
+          title: const Text(
+            'الأرشفة الإدارية',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
+          ),
           centerTitle: true,
+          elevation: 2,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.search),
+              onPressed: () {
+                // فتح شاشة البحث العام
+              },
+            ),
+          ],
         ),
         body: Padding(
-          padding: const EdgeInsets.all(20.0),
+          padding: const EdgeInsets.all(12.0),
+          child: GridView.builder(
+            itemCount: mainCategories.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2, // عدد الأعمدة (يمكن تعديلها لـ 3 على الشاشات الكبيرة)
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.1,
+            ),
+            itemBuilder: (context, index) {
+              final category = mainCategories[index];
+              return _buildCategoryCard(context, category);
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryCard(BuildContext context, RegisterCategory category) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      child: InkWell(
+        onTap: () {
+          // الانتقال لشاشة خيارات السجل المختار
+          _navigateToRegisterOptions(context, category);
+        },
+        borderRadius: BorderRadius.circular(15),
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(15),
+            gradient: LinearGradient(
+              colors: [Colors.white, Colors.indigo.shade50],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // زر اختيار ملف الإكسيل
-              ElevatedButton.icon(
-                onPressed: pickAndLoadExcel,
-                icon: const Icon(Icons.file_upload),
-                label: Text(excelFilePath == null ? "اختر ملف إكسيل الكنترول" : "تم اختيار الملف بنجاح"),
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(15)),
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: category.color.withOpacity(0.15),
+                child: Icon(category.icon, size: 30, color: category.color),
               ),
-              const SizedBox(height: 30),
-
-              // قائمة اختيار المواد (تظهر فقط بعد رفع الملف وقراءته بنجاح)
-              if (subjects.isNotEmpty) ...[
-                const Text(
-                  "اختر المادة المراد رصدها حالياً:",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              const SizedBox(height: 10),
+              Text(
+                category.title,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
                 ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    border: Border.color(Colors.grey),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      value: selectedSubject,
-                      isExpanded: true,
-                      items: subjects.map((String subject) {
-                        return DropdownMenuItem<String>(
-                          value: subject,
-                          child: Text(subject),
-                        );
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          selectedSubject = newValue;
-                        });
-                      },
-                    ),
-                  ),
-                ),
-              ] else if (excelFilePath != null) ...[
-                const Text(
-                  "تنبيه: لم يتم العثور على مواد في الأعمدة من E إلى S في هذا الملف.",
-                  style: TextStyle(color: Colors.red),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  void _navigateToRegisterOptions(BuildContext context, RegisterCategory category) {
+    // سيتم ربطها بشاشة الخيارات (إضافة / استعراض)
   }
 }
