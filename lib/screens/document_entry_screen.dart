@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'register_category.dart';
+import '../models/register_category.dart';
 
 class DocumentEntryScreen extends StatefulWidget {
   final RegisterCategory category;
