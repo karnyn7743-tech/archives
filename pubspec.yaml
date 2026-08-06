@@ -1,4 +1,4 @@
-name: school_grading_app
+name: secretariat_app
 description: "A Flutter application for student attendance and smart QR/OCR grading system."
 publish_to: 'none'
 
