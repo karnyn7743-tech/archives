@@ -21,7 +21,7 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
   @override
   void initState() {
     super.initState();
-    // إنشاء متحكم لكل عمود في السجل تلقائياً
+    // إنشاء حقل لكل عمود في ورقة العمل الخاصة بالسجل
     for (var col in widget.category.columns) {
       if (col != 'م') {
         _controllers[col] = TextEditingController();
@@ -37,60 +37,74 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
     super.dispose();
   }
 
-  // دالة إنشاء ملف Excel وتصديره ومشاركته
-  Future<void> _saveAndExportDocument() async {
+  // الحصول على المسار الموحد لملف Archives.xlsx في التخزين الداخلي
+  Future<File> _getArchivesFile() async {
+    final directory = await getApplicationDocumentsDirectory();
+    final path = '${directory.path}/Archives.xlsx';
+    return File(path);
+  }
+
+  Future<void> _saveToUnifiedExcel() async {
     if (!_formKey.currentState!.validate()) return;
 
     try {
-      // 1. إنشاء ملف Excel جديد
-      var excel = Excel.createExcel();
+      final file = await _getArchivesFile();
+      Excel excel;
+
+      if (await file.exists()) {
+        var bytes = await file.readAsBytes();
+        excel = Excel.decodeBytes(bytes);
+      } else {
+        excel = Excel.createExcel();
+      }
+
       String sheetName = widget.category.excelSheetName;
-      
-      // تغيير اسم ورقة العمل أو استخدام الافتراضية
-      Sheet sheetObject = excel[sheetName];
-      excel.setDefaultSheet(sheetName);
+      Sheet sheet = excel[sheetName];
 
-      // 2. إضافة رؤوس الأعمدة
-      List<CellValue> headers = widget.category.columns.map((e) => TextCellValue(e)).toList();
-      sheetObject.appendRow(headers);
+      // إضافة رؤوس الأعمدة إذا كانت الورقة فارغة
+      if (sheet.maxRows == 0) {
+        List<CellValue> headers = widget.category.columns.map((e) => TextCellValue(e)).toList();
+        sheet.appendRow(headers);
+      }
 
-      // 3. إضافة البيانات أدخلها المستخدم
-      List<CellValue> rowData = [];
+      // إحتساب التسلسل الآلي (م) بناءً على عدد الصفوف الحالية
+      int nextAutoId = sheet.maxRows > 0 ? sheet.maxRows : 1;
+
+      // تجميع بيانات الصف الجديد بناءً على حقول الشاشة
+      List<CellValue> newRow = [];
       for (var col in widget.category.columns) {
         if (col == 'م') {
-          rowData.add(TextCellValue('1'));
+          newRow.add(TextCellValue(nextAutoId.toString()));
         } else {
-          rowData.add(TextCellValue(_controllers[col]?.text ?? ''));
+          newRow.add(TextCellValue(_controllers[col]?.text ?? ''));
         }
       }
-      sheetObject.appendRow(rowData);
 
-      // 4. ترميز الملف وتحديد المسار المؤقت للحفظ
+      sheet.appendRow(newRow);
+
+      // حفظ الملف المحدث في ذاكرة التطبيق
       var fileBytes = excel.save();
       if (fileBytes != null) {
-        final directory = await getTemporaryDirectory();
-        final filePath = '${directory.path}/${widget.category.excelSheetName}_${DateTime.now().millisecondsSinceEpoch}.xlsx';
-        
-        File(filePath)
-          ..createSync(recursive: true)
-          ..writeAsBytesSync(fileBytes);
+        await file.writeAsBytes(fileBytes);
 
-        // 5. فتح نافذة المشاركة فوراً لحفظ الملف في Downloads أو إرساله
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تم تجهيز الملف بنجاح!')),
+            SnackBar(content: Text('تمت إضافة السجل إلى ورقة "${widget.category.title}" بنجاح!')),
           );
-          
+
+          // إتاحة خيار مشاركة/تصدير النسخة المحدثة فوراً
           await Share.shareXFiles(
-            [XFile(filePath)],
-            text: 'سجل مأرشف: ${widget.category.title}',
+            [XFile(file.path)],
+            text: 'ملف الأرشفة الموحد المحدث - Archives.xlsx',
           );
+
+          Navigator.pop(context);
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('حدث خطأ أثناء التصدير: $e')),
+          SnackBar(content: Text('حدث خطأ أثناء الحفظ: $e')),
         );
       }
     }
@@ -121,11 +135,13 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
                       children: [
                         Icon(widget.category.icon, color: widget.category.color),
                         const SizedBox(width: 8),
-                        Text(
-                          'تعبئة بيانات ${widget.category.title}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: widget.category.color,
+                        Expanded(
+                          child: Text(
+                            'تعبئة بيانات ورقة: ${widget.category.excelSheetName}',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: widget.category.color,
+                            ),
                           ),
                         ),
                       ],
@@ -133,8 +149,8 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                
-                // توليد الحقول ديناميكياً حسب أعمدة السجل
+
+                // توليد الحقول المطابقة لرؤوس أعمدة الورقة بالضبط
                 ...widget.category.columns.where((col) => col != 'م').map((colName) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12.0),
@@ -157,11 +173,10 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
 
                 const SizedBox(height: 20),
 
-                // زر حفظ الوثيقة وتصديرها
                 ElevatedButton.icon(
-                  onPressed: _saveAndExportDocument,
-                  icon: const Icon(Icons.save_alt_rounded),
-                  label: const Text('حفظ وتصدير إلى Excel', style: TextStyle(fontSize: 16)),
+                  onPressed: _saveToUnifiedExcel,
+                  icon: const Icon(Icons.save_rounded),
+                  label: const Text('حفظ في ملف Archives.xlsx الموحد', style: TextStyle(fontSize: 16)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: widget.category.color,
                     foregroundColor: Colors.white,
