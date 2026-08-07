@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:excel/excel.dart' hide Border; // حل تضارب الاسم مع Flutter Border
+import 'package:excel/excel.dart' hide Border;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/register_category.dart';
@@ -41,12 +41,36 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
     super.dispose();
   }
 
-  // التقاط صورة من الكاميرا أو اختيارها من المعرض
+  /// الوصول إلى المسار الرئيسي العام في ذاكرة الهاتف الظاهرة (Public Storage)
+  Future<Directory> _getPublicArchivesDirectory() async {
+    Directory? externalDir = await getExternalStorageDirectory();
+    String newPath = "";
+    
+    // استخراج مسار التخزين الرئيسي للجوال /storage/emulated/0/
+    List<String> paths = externalDir!.path.split("/");
+    for (int x = 1; x < paths.length; x++) {
+      String folder = paths[x];
+      if (folder != "Android") {
+        newPath += "/" + folder;
+      } else {
+        break;
+      }
+    }
+    
+    // إنشاء مجلد archives المرئي داخل مجلد Documents
+    Directory mainArchivesDir = Directory("$newPath/Documents/archives");
+    if (!await mainArchivesDir.exists()) {
+      await mainArchivesDir.create(recursive: true);
+    }
+    return mainArchivesDir;
+  }
+
+  // التقاط صورة أو اختيارها من المعرض
   Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? pickedFile = await _picker.pickImage(
         source: source,
-        imageQuality: 80,
+        imageQuality: 85,
       );
       if (pickedFile != null) {
         setState(() {
@@ -60,14 +84,12 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
     }
   }
 
-  // حفظ الصورة داخل مجلد Documents/archives/[اسم السجل]
-  Future<String?> _saveImageToArchiveFolder() async {
+  // حفظ الصورة داخل المجلد الخاص بالسجل: Documents/archives/[اسم السجل]/
+  Future<String?> _saveImageToCategoryFolder(Directory archivesDir) async {
     if (_selectedImage == null) return null;
 
     try {
-      final docsDir = await getApplicationDocumentsDirectory();
-      final categoryFolder = Directory('${docsDir.path}/archives/${widget.category.excelSheetName}');
-
+      final categoryFolder = Directory('${archivesDir.path}/${widget.category.excelSheetName}');
       if (!await categoryFolder.exists()) {
         await categoryFolder.create(recursive: true);
       }
@@ -80,16 +102,9 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
     }
   }
 
-  // مسار ملف الإكسل الموحد
-  Future<File> _getArchivesExcelFile() async {
-    final docsDir = await getApplicationDocumentsDirectory();
-    final archivesFolder = Directory('${docsDir.path}/archives');
-    
-    if (!await archivesFolder.exists()) {
-      await archivesFolder.create(recursive: true);
-    }
-
-    final file = File('${archivesFolder.path}/Archives.xlsx');
+  // الحصول على ملف Archives.xlsx الموحد في المسار الظاهر
+  Future<File> _getArchivesExcelFile(Directory archivesDir) async {
+    final file = File('${archivesDir.path}/Archives.xlsx');
 
     if (!await file.exists()) {
       try {
@@ -108,7 +123,7 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
     return file;
   }
 
-  // حفظ الوثيقة وتحديث الإكسل
+  // حفظ بيانات الأرشفة وتحديث ملف الإكسل والصورة
   Future<void> _saveDocument() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -117,11 +132,14 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
     });
 
     try {
-      // 1. حفظ الصورة المرفقة إن وجدت
-      final savedImagePath = await _saveImageToArchiveFolder();
+      // 1. تحديد مجلد archives الظاهر في المستندات
+      final archivesDir = await _getPublicArchivesDirectory();
 
-      // 2. تحديث ملف الإكسل
-      final file = await _getArchivesExcelFile();
+      // 2. حفظ الصورة المرفقة في مجلد السجل
+      final savedImagePath = await _saveImageToCategoryFolder(archivesDir);
+
+      // 3. قراءة وتحديث ملف Archives.xlsx الموحد
+      final file = await _getArchivesExcelFile(archivesDir);
       final bytes = await file.readAsBytes();
       final excel = Excel.decodeBytes(bytes);
 
@@ -141,7 +159,7 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
           rowData.add(TextCellValue(autoId.toString()));
         } else if (colName.contains('ملاحظات') && savedImagePath != null) {
           String userNotes = _controllers[colName]?.text.trim() ?? '';
-          rowData.add(TextCellValue('$userNotes (مرفق: $savedImagePath)'));
+          rowData.add(TextCellValue('$userNotes [مسار الصورة: $savedImagePath]'));
         } else {
           rowData.add(TextCellValue(_controllers[colName]?.text.trim() ?? ''));
         }
@@ -155,9 +173,10 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('تم حفظ الوثيقة وتحديث ملف Archives.xlsx بنجاح!'),
+            SnackBar(
+              content: Text('تم الحفظ في: Documents/archives/${widget.category.excelSheetName}'),
               backgroundColor: Colors.green,
+              duration: const Duration(seconds: 4),
             ),
           );
           Navigator.pop(context);
@@ -196,7 +215,7 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // قسم التقاط/اختيار الصورة
+                      // اختيار/التقاط الصورة
                       Card(
                         elevation: 2,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -246,7 +265,7 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // توليد الحقول
+                      // توليد حقول الإدخال
                       ...widget.category.columns.where((col) => col != 'م').map((colName) {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12.0),
