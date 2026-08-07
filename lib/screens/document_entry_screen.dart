@@ -4,6 +4,7 @@ import 'package:flutter/services.dart' show rootBundle;
 import 'package:excel/excel.dart' hide Border;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../models/register_category.dart';
 
 class DocumentEntryScreen extends StatefulWidget {
@@ -41,12 +42,33 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
     super.dispose();
   }
 
-  /// الوصول إلى المسار الرئيسي العام في ذاكرة الهاتف الظاهرة (Public Storage)
+  /// طلب صريح لإذن الوصول للتخزين من المستخدم
+  Future<bool> _requestStoragePermission() async {
+    if (Platform.isAndroid) {
+      // محاولة الحصول على إذن التخزين العادي
+      var status = await Permission.storage.status;
+      if (!status.isGranted) {
+        status = await Permission.storage.request();
+      }
+
+      // في أندرويد 11+ (API 30+) يتطلب الأمر إذن إدارة الملفات الكامل
+      if (!status.isGranted) {
+        var manageStatus = await Permission.manageExternalStorage.status;
+        if (!manageStatus.isGranted) {
+          manageStatus = await Permission.manageExternalStorage.request();
+        }
+        return manageStatus.isGranted;
+      }
+      return status.isGranted;
+    }
+    return true;
+  }
+
+  /// الحصول على المسار الرئيسي العام في ذاكرة الهاتف (Documents/archives)
   Future<Directory> _getPublicArchivesDirectory() async {
     Directory? externalDir = await getExternalStorageDirectory();
     String newPath = "";
     
-    // استخراج مسار التخزين الرئيسي للجوال /storage/emulated/0/
     List<String> paths = externalDir!.path.split("/");
     for (int x = 1; x < paths.length; x++) {
       String folder = paths[x];
@@ -57,7 +79,6 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
       }
     }
     
-    // إنشاء مجلد archives المرئي داخل مجلد Documents
     Directory mainArchivesDir = Directory("$newPath/Documents/archives");
     if (!await mainArchivesDir.exists()) {
       await mainArchivesDir.create(recursive: true);
@@ -84,7 +105,7 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
     }
   }
 
-  // حفظ الصورة داخل المجلد الخاص بالسجل: Documents/archives/[اسم السجل]/
+  // حفظ الصورة داخل مجلد السجل المحدد
   Future<String?> _saveImageToCategoryFolder(Directory archivesDir) async {
     if (_selectedImage == null) return null;
 
@@ -102,7 +123,7 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
     }
   }
 
-  // الحصول على ملف Archives.xlsx الموحد في المسار الظاهر
+  // الحصول على أو إنشاء ملف Archives.xlsx الموحد
   Future<File> _getArchivesExcelFile(Directory archivesDir) async {
     final file = File('${archivesDir.path}/Archives.xlsx');
 
@@ -123,22 +144,36 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
     return file;
   }
 
-  // حفظ بيانات الأرشفة وتحديث ملف الإكسل والصورة
+  // حفظ بيانات الأرشفة وتحديث الإكسل
   Future<void> _saveDocument() async {
     if (!_formKey.currentState!.validate()) return;
+
+    // 1. التحقق من صلاحية التخزين وطلبها من المستخدم
+    bool hasPermission = await _requestStoragePermission();
+    if (!hasPermission) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('يرجى إعطاء صلاحية الوصول للذاكرة لتتمكن من حفظ الملفات'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      // 1. تحديد مجلد archives الظاهر في المستندات
+      // 2. الحصول على مسار مجلد archives
       final archivesDir = await _getPublicArchivesDirectory();
 
-      // 2. حفظ الصورة المرفقة في مجلد السجل
+      // 3. حفظ الصورة المرفقة إن وجدت
       final savedImagePath = await _saveImageToCategoryFolder(archivesDir);
 
-      // 3. قراءة وتحديث ملف Archives.xlsx الموحد
+      // 4. قراءة ملف الإكسل وتحديثه
       final file = await _getArchivesExcelFile(archivesDir);
       final bytes = await file.readAsBytes();
       final excel = Excel.decodeBytes(bytes);
@@ -159,7 +194,7 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
           rowData.add(TextCellValue(autoId.toString()));
         } else if (colName.contains('ملاحظات') && savedImagePath != null) {
           String userNotes = _controllers[colName]?.text.trim() ?? '';
-          rowData.add(TextCellValue('$userNotes [مسار الصورة: $savedImagePath]'));
+          rowData.add(TextCellValue('$userNotes [المسار: $savedImagePath]'));
         } else {
           rowData.add(TextCellValue(_controllers[colName]?.text.trim() ?? ''));
         }
@@ -174,7 +209,7 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('تم الحفظ في: Documents/archives/${widget.category.excelSheetName}'),
+              content: Text('تم الحفظ بنجاح في: Documents/archives/${widget.category.excelSheetName}'),
               backgroundColor: Colors.green,
               duration: const Duration(seconds: 4),
             ),
@@ -215,7 +250,7 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // اختيار/التقاط الصورة
+                      // كارت التقاط واختيار الصورة
                       Card(
                         elevation: 2,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
