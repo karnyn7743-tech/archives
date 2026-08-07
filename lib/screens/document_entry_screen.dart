@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:excel/excel.dart';
+import 'package:excel/excel.dart' hide Border; // حل تضارب الاسم مع Flutter Border
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/register_category.dart';
