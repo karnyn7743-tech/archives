@@ -2,8 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:excel/excel.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 import '../models/register_category.dart';
 
 class DocumentEntryScreen extends StatefulWidget {
@@ -18,12 +18,14 @@ class DocumentEntryScreen extends StatefulWidget {
 class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
   final _formKey = GlobalKey<FormState>();
   final Map<String, TextEditingController> _controllers = {};
+  
+  File? _selectedImage;
+  final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    // إنشاء متحكم لكل عمود في السجل باستثناء خانة التسلسل الآلي (م)
     for (var col in widget.category.columns) {
       if (col != 'م') {
         _controllers[col] = TextEditingController();
@@ -39,13 +41,56 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
     super.dispose();
   }
 
-  /// الحصول على مسار الملف المحلي الموحد في ذاكرة الهاتف الدائمة
-  Future<File> _getLocalArchivesFile() async {
-    final directory = await getApplicationDocumentsDirectory();
-    final path = '${directory.path}/Archives.xlsx';
-    final file = File(path);
+  // التقاط صورة من الكاميرا أو اختيارها من المعرض
+  Future<void> _pickImage(ImageSource source) async {
+    try {
+      final XFile? pickedFile = await _picker.pickImage(
+        source: source,
+        imageQuality: 80,
+      );
+      if (pickedFile != null) {
+        setState(() {
+          _selectedImage = File(pickedFile.path);
+        });
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('خطأ في اختيار الصورة: $e')),
+      );
+    }
+  }
 
-    // إذا لم يكن الملف موجوداً في التخزين المحلي، نتحقق من وجود نسخة أولية في الـ Assets
+  // حفظ الصورة داخل مجلد Documents/archives/[اسم السجل]
+  Future<String?> _saveImageToArchiveFolder() async {
+    if (_selectedImage == null) return null;
+
+    try {
+      final docsDir = await getApplicationDocumentsDirectory();
+      final categoryFolder = Directory('${docsDir.path}/archives/${widget.category.excelSheetName}');
+
+      if (!await categoryFolder.exists()) {
+        await categoryFolder.create(recursive: true);
+      }
+
+      final fileName = 'doc_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final savedImage = await _selectedImage!.copy('${categoryFolder.path}/$fileName');
+      return savedImage.path;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // مسار ملف الإكسل الموحد
+  Future<File> _getArchivesExcelFile() async {
+    final docsDir = await getApplicationDocumentsDirectory();
+    final archivesFolder = Directory('${docsDir.path}/archives');
+    
+    if (!await archivesFolder.exists()) {
+      await archivesFolder.create(recursive: true);
+    }
+
+    final file = File('${archivesFolder.path}/Archives.xlsx');
+
     if (!await file.exists()) {
       try {
         final byteData = await rootBundle.load('assets/Archives.xlsx');
@@ -53,7 +98,6 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
           byteData.buffer.asUint8List(byteData.offsetInBytes, byteData.lengthInBytes),
         );
       } catch (_) {
-        // في حال عدم وجود ملف بالـ Assets يتم إنشاء ملف جديد وتأسيسه تلقائياً
         final newExcel = Excel.createExcel();
         final bytes = newExcel.save();
         if (bytes != null) {
@@ -64,8 +108,8 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
     return file;
   }
 
-  /// فتح الملف الموحد وتحديث بيانات الورقة الحالية ثم حفظه
-  Future<void> _saveAndAppendRecord() async {
+  // حفظ الوثيقة وتحديث الإكسل
+  Future<void> _saveDocument() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -73,66 +117,56 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
     });
 
     try {
-      final file = await _getLocalArchivesFile();
+      // 1. حفظ الصورة المرفقة إن وجدت
+      final savedImagePath = await _saveImageToArchiveFolder();
+
+      // 2. تحديث ملف الإكسل
+      final file = await _getArchivesExcelFile();
       final bytes = await file.readAsBytes();
       final excel = Excel.decodeBytes(bytes);
 
       String sheetName = widget.category.excelSheetName;
       Sheet sheet = excel[sheetName];
 
-      // إذا كانت الورقة فارغة، نقوم بكتابة العناوين الأساسية أولاً
       if (sheet.maxRows == 0) {
-        List<CellValue> headers =
-            widget.category.columns.map((e) => TextCellValue(e)).toList();
+        List<CellValue> headers = widget.category.columns.map((e) => TextCellValue(e)).toList();
         sheet.appendRow(headers);
       }
 
-      // حساب رقم التسلسل الآلي (م) استناداً إلى عدد الصفوف الحالية
-      int autoIncrementId = sheet.maxRows;
+      int autoId = sheet.maxRows;
+      List<CellValue> rowData = [];
 
-      // تجميع قيم الحقول المدخلة وفقاً لترتيب الأعمدة بالضبط
-      List<CellValue> rowCells = [];
       for (var colName in widget.category.columns) {
         if (colName == 'م') {
-          rowCells.add(TextCellValue(autoIncrementId.toString()));
+          rowData.add(TextCellValue(autoId.toString()));
+        } else if (colName.contains('ملاحظات') && savedImagePath != null) {
+          String userNotes = _controllers[colName]?.text.trim() ?? '';
+          rowData.add(TextCellValue('$userNotes (مرفق: $savedImagePath)'));
         } else {
-          String textValue = _controllers[colName]?.text.trim() ?? '';
-          rowCells.add(TextCellValue(textValue));
+          rowData.add(TextCellValue(_controllers[colName]?.text.trim() ?? ''));
         }
       }
 
-      // إدراج الصف الجديد في نهاية السجل
-      sheet.appendRow(rowCells);
+      sheet.appendRow(rowData);
 
-      // حفظ التعديلات نهائياً على الملف المحلي
       final updatedBytes = excel.save();
       if (updatedBytes != null) {
         await file.writeAsBytes(updatedBytes, flush: true);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('تمت إضافة السجل وتحديث ملف Archives.xlsx بنجاح!'),
+            const SnackBar(
+              content: Text('تم حفظ الوثيقة وتحديث ملف Archives.xlsx بنجاح!'),
               backgroundColor: Colors.green,
             ),
           );
-
-          // إتاحة خيار فتح/مشاركة النسخة المحدثة فوراً
-          await Share.shareXFiles(
-            [XFile(file.path)],
-            text: 'سجل مأرشف محدّث: ${widget.category.title}',
-          );
-
           Navigator.pop(context);
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('حدث خطأ أثناء تحديث الملف: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('حدث خطأ أثناء الحفظ: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -162,27 +196,49 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // قسم التقاط/اختيار الصورة
                       Card(
-                        color: widget.category.color.withOpacity(0.1),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+                        elevation: 2,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         child: Padding(
                           padding: const EdgeInsets.all(12.0),
-                          child: Row(
+                          child: Column(
                             children: [
-                              Icon(widget.category.icon, color: widget.category.color),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'تحديث ورقة: ${widget.category.excelSheetName}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                    color: widget.category.color,
+                              _selectedImage != null
+                                  ? ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.file(_selectedImage!, height: 160, fit: BoxFit.cover),
+                                    )
+                                  : Container(
+                                      height: 100,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade100,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.grey.shade300),
+                                      ),
+                                      child: const Center(
+                                        child: Text('لم يتم إرفاق صورة للوثيقة بعد'),
+                                      ),
+                                    ),
+                              const SizedBox(height: 10),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  ElevatedButton.icon(
+                                    onPressed: () => _pickImage(ImageSource.camera),
+                                    icon: const Icon(Icons.camera_alt),
+                                    label: const Text('الكاميرا'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: widget.category.color,
+                                      foregroundColor: Colors.white,
+                                    ),
                                   ),
-                                ),
+                                  OutlinedButton.icon(
+                                    onPressed: () => _pickImage(ImageSource.gallery),
+                                    icon: const Icon(Icons.photo_library),
+                                    label: const Text('المعرض'),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -190,7 +246,7 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // توليد حقول الإدخال الديناميكية لجميع أعمدة ورقة العمل
+                      // توليد الحقول
                       ...widget.category.columns.where((col) => col != 'م').map((colName) {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12.0),
@@ -199,10 +255,7 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
                             decoration: InputDecoration(
                               labelText: colName,
                               border: const OutlineInputBorder(),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 12,
-                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                             ),
                             validator: (value) {
                               if (value == null || value.trim().isEmpty) {
@@ -214,15 +267,12 @@ class _DocumentEntryScreenState extends State<DocumentEntryScreen> {
                         );
                       }).toList(),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
 
                       ElevatedButton.icon(
-                        onPressed: _saveAndAppendRecord,
+                        onPressed: _saveDocument,
                         icon: const Icon(Icons.save_rounded),
-                        label: const Text(
-                          'حفظ وتحديث الملف الموحد',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
+                        label: const Text('حفظ الوثيقة والسجل', style: TextStyle(fontSize: 16)),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: widget.category.color,
                           foregroundColor: Colors.white,
