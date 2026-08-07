@@ -11,15 +11,13 @@ dependencies:
   flutter:
     sdk: flutter
   image_picker: ^1.1.2
+  permission_handler: ^11.3.1
 
   # المكتبات المطلوبة للتصدير والمشاركة والمجال
   share_plus: ^10.0.2
-    
-  # مكتبات إدارة الملفات والإكسل
   excel: ^4.0.6
   path_provider: ^2.1.3
   file_picker: ^8.0.3
-  permission_handler: ^11.3.1
   
   # مكتبات المسح الضوئي والتعرف على المستندات والـ QR
   mobile_scanner: ^5.2.3
