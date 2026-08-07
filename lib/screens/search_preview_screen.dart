@@ -1,6 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:excel/excel.dart';
+import 'package:excel/excel.dart' hide Border;
 import 'package:path_provider/path_provider.dart';
 import '../models/register_category.dart';
 
@@ -27,8 +27,19 @@ class _SearchPreviewScreenState extends State<SearchPreviewScreen> {
 
   Future<void> _loadDataFromExcel() async {
     try {
-      final docsDir = await getApplicationDocumentsDirectory();
-      final filePath = '${docsDir.path}/archives/Archives.xlsx';
+      Directory? externalDir = await getExternalStorageDirectory();
+      String newPath = "";
+      List<String> paths = externalDir!.path.split("/");
+      for (int x = 1; x < paths.length; x++) {
+        String folder = paths[x];
+        if (folder != "Android") {
+          newPath += "/" + folder;
+        } else {
+          break;
+        }
+      }
+
+      final filePath = '$newPath/Documents/archives/Archives.xlsx';
       final file = File(filePath);
 
       if (await file.exists()) {
