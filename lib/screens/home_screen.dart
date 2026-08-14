@@ -11,7 +11,7 @@ class HomeScreen extends StatelessWidget {
       textDirection: TextDirection.rtl,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('الأرشفة الإدارية والسكرتارية للقعقاع الهاشمي'),
+          title: const Text('الأرشفة الإدارية للقعقاع الهاشمي'),
           centerTitle: true,
         ),
         body: GridView.builder(
