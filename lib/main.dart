@@ -1,13 +1,20 @@
 import 'package:flutter/material.dart';
-import 'models/register_category.dart';
 import 'screens/home_screen.dart';
+import 'screens/activation_screen.dart';
+import 'services/license_service.dart';
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // فحص حالة التفعيل قبل بناء الواجهات
+  final bool activated = await LicenseService.isActivated();
+
+  runApp(MyApp(isActivated: activated));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  final bool isActivated;
+  const MyApp({Key? key, required this.isActivated}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +25,8 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.indigo,
         useMaterial3: true,
       ),
-      home: const HomeScreen(), // توجيه التطبيق مباشرة إلى الشاشة الرئيسية المعرفة
+      // إذا كان مفعلاً يتجه للشاشة الرئيسية مباشرة، وإلا يتجه لشاشة التنشيط
+      home: isActivated ? const HomeScreen() : const ActivationScreen(),
     );
   }
 }
