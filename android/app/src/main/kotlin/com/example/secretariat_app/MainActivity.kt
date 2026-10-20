@@ -1,4 +1,4 @@
-package com.example.secretariat_app
+package com.example.archives_app
 
 import io.flutter.embedding.android.FlutterActivity
 
