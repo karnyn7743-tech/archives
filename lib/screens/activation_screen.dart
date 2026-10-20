@@ -24,7 +24,9 @@ class _ActivationScreenState extends State<ActivationScreen> {
 
   Future<void> _loadDeviceId() async {
     final id = await LicenseService.getDeviceId();
-    setState(() => _deviceId = id);
+    if (mounted) {
+      setState(() => _deviceId = id);
+    }
   }
 
   void _activate() async {
@@ -33,7 +35,8 @@ class _ActivationScreenState extends State<ActivationScreen> {
       _errorMessage = "";
     });
 
-    final result = LicenseService.verifyKey(_keyController.text, _deviceId);
+    final result = await LicenseService.verifyKey(_keyController.text, _deviceId);
+
     if (result['isValid'] == true) {
       await LicenseService.saveLicense(_keyController.text);
       if (mounted) {
@@ -48,6 +51,12 @@ class _ActivationScreenState extends State<ActivationScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  @override
+  void dispose() {
+    _keyController.dispose();
+    super.dispose();
   }
 
   @override
